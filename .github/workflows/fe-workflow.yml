@@ -1,0 +1,133 @@
+name: KTB Team20 Frontend CI/CD
+
+on:
+  push: # main 브랜치에 푸시될 때마다 워크플로우 실행
+    branches:
+      - main
+    paths: # 다음 경로의 파일이 변경될 때만 실행
+      - 'apps/frontend/**' 
+      - '.github/workflows/fe-workflow.yml'
+
+jobs:
+  # 1. 각 node 버전별 의존성 테스트
+  check-dependency:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [ 19.x, 20.x, 22.x ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Set up Node.js runtime
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install Dependencies
+        run: npm install
+  # 2. Docker 이미지 빌드 및 푸시
+  build-and-push-image:
+    needs: check-dependency
+    runs-on: ubuntu-latest
+    steps:
+      # 2-1. Repository 체크아웃
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      # 2-2. AWS 자격증명 설정
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      # 2-3. S3에 docker-compose-ci.yaml 파일 업로드
+      - name: Upload docker-compose-ci.yaml to S3
+        run: |
+          aws s3 cp ./apps/frontend/docker-compose-ci.yaml s3://${{ secrets.DEPLOY_BUCKET }}/frontend/docker-compose.yaml
+      # 2-4. S3에서 .env 파일 다운로드 및 next.js 주요 환경 변수 설정
+      - name: Download .env from S3 and export vars
+        run: |
+          aws s3 cp s3://${{ secrets.DEPLOY_BUCKET }}/frontend/.env ./apps/frontend/.env
+          echo "NEXT_PUBLIC_API_URL=$(grep NEXT_PUBLIC_API_URL ./apps/frontend/.env | cut -d '=' -f2 | tr -d '\r')" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SOCKET_URL=$(grep NEXT_PUBLIC_SOCKET_URL ./apps/frontend/.env | cut -d '=' -f2 | tr -d '\r')" >> $GITHUB_ENV
+      # 2-5. Docker Hub 로그인
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # 2-6. Docker 이미지 빌드 및 푸시
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/frontend
+          file: ./apps/frontend/Dockerfile-ci
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/ktb-team20-fe:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/ktb-team20-fe:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ env.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_SOCKET_URL=${{ env.NEXT_PUBLIC_SOCKET_URL }}
+  # 3. 배포
+  deploy:
+    needs: build-and-push-image
+    runs-on: ubuntu-latest
+    env: # 배포에 필요한 환경 변수 로드
+      TARGET_GROUP_ARN: ${{ secrets.FE_TARGET_GROUP_ARN }}
+      APP_USER: ubuntu
+      IMAGE_TAG: ${{ github.sha }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DEPLOY_BUCKET: ${{ secrets.DEPLOY_BUCKET }}
+    steps:
+      # 3-1. Repository 체크아웃
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      # 3-2. AWS 자격증명 설정
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      # 3-3. 각 인스턴스 SSH 접속을 위한 .pem key 생성
+      - name: Create PEM key
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ./key.pem
+          chmod 600 ./key.pem
+      # 3-4. S3에서 docker-compose.yaml 파일 다운로드
+      - name: Download .env from S3
+        run: aws s3 cp s3://${{ env.DEPLOY_BUCKET }}/frontend/docker-compose.yaml ./docker-compose.yaml
+      # 3-5. 대상 그룹에서 배포 대상 인스턴스 (IP) 확인
+      - name: Get Instance IPs
+        id: get-ips
+        run: |
+          IDS=$(aws elbv2 describe-target-health --target-group-arn ${{ env.TARGET_GROUP_ARN }} --query 'TargetHealthDescriptions[*].Target.Id' --output text)
+          if [ -z "$IDS" ]; then echo "No instances"; exit 1; fi
+          IPS=$(aws ec2 describe-instances --instance-ids $IDS --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
+          echo "instance_ips=$IPS" >> $GITHUB_OUTPUT
+      # 3-6. 배포
+      - name: Deploy to all instances
+        run: |
+          IFS=' ' read -r -a IPS <<< "${{ steps.get-ips.outputs.instance_ips }}"
+          PIDS=()
+          for IP in "${IPS[@]}"; do
+            echo "🚀 배포 시작: $IP"
+            (
+              # 1. 파일 직접 던져주기 (SCP)
+              scp -i ./key.pem -o StrictHostKeyChecking=no ./docker-compose.yaml $APP_USER@$IP:/home/$APP_USER/docker-compose.yaml
+              # 2. 원격 접속해서 실행만 시키기 (SSH)
+              ssh -i ./key.pem -o StrictHostKeyChecking=no $APP_USER@$IP << EOF
+                set -e
+                echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+                sed -i 's|{{IMAGE_TAG}}|$IMAGE_TAG|g' /home/$APP_USER/docker-compose.yaml
+                docker compose -f /home/$APP_USER/docker-compose.yaml down || true
+                docker compose -f /home/$APP_USER/docker-compose.yaml pull
+                docker compose -f /home/$APP_USER/docker-compose.yaml up -d --remove-orphans
+          EOF
+            ) & 
+            PIDS+=($!)
+          done
+          for PID in "${PIDS[@]}"; do wait $PID; done
+          rm -f ./key.pem
+          echo "🎉 모든 배포 완료!"
