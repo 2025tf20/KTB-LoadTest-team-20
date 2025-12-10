@@ -28,10 +28,7 @@ public class SessionMongoStore implements SessionStore {
     
     @Override
     public void delete(String userId, String sessionId) {
-        Session session = sessionRepository.findByUserId(userId).orElse(null);
-        if (session != null && sessionId.equals(session.getSessionId())) {
-            sessionRepository.delete(session);
-        }
+        sessionRepository.deleteByUserIdAndSessionId(userId, sessionId);
     }
     
     @Override
