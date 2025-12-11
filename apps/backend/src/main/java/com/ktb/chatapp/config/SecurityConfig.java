@@ -30,7 +30,6 @@ public class SecurityConfig {
     private final JwtDecoder jwtDecoder;
     private final CustomBearerTokenResolver bearerTokenResolver;
     private final SessionAwareJwtAuthenticationConverter jwtAuthenticationConverter;
-    private final LoggingFilter loggingFilter;
 
     private static final List<String> CORS_ALLOWED_ORIGINS = List.of("*");
 
@@ -89,8 +88,7 @@ public class SecurityConfig {
                                 .decoder(jwtDecoder)
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter)
                         )
-                )
-                .addFilterBefore(loggingFilter, CorsFilter.class);
+                );
         
         return http.build();
     }

@@ -129,7 +129,6 @@ public class S3FileService {
      * PUT용 Presigned URL 생성 (공통 로직)
      */
     private String generatePresignedPutUrl(String key, String mimetype) {
-        System.out.println("generatePresignedPutUrl " + mimetype);
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
