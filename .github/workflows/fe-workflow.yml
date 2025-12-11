@@ -131,24 +131,25 @@ jobs:
       - name: Deploy to all instances
         run: |
           IFS=' ' read -r -a IPS <<< "${{ steps.get-ips.outputs.instance_ips }}"
-          PIDS=()
           for IP in "${IPS[@]}"; do
-            echo "🚀 배포 시작: $IP"
-            (
-              # 1. 파일 직접 던져주기 (SCP)
-              scp -i ./key.pem -o StrictHostKeyChecking=no ./docker-compose.yaml $APP_USER@$IP:/home/$APP_USER/docker-compose.yaml
-              # 2. 원격 접속해서 실행만 시키기 (SSH)
-              ssh -i ./key.pem -o StrictHostKeyChecking=no $APP_USER@$IP << EOF
+            echo "--------------------------------------------------"
+            echo "🚀 [순차 배포 시작] 대상 IP: $IP"
+            # 1. 파일 전송 (SCP)
+            scp -i ./key.pem -o StrictHostKeyChecking=no ./docker-compose.yaml $APP_USER@$IP:/home/$APP_USER/docker-compose.yaml     
+            # 2. 원격 접속 및 실행 (SSH)
+            ssh -i ./key.pem -o StrictHostKeyChecking=no $APP_USER@$IP << EOF
                 set -e
                 echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+                # 이미지 태그 변경
                 sed -i 's|{{IMAGE_TAG}}|$IMAGE_TAG|g' /home/$APP_USER/docker-compose.yaml
-                docker compose -f /home/$APP_USER/docker-compose.yaml down || true
+                # 배포 명령
                 docker compose -f /home/$APP_USER/docker-compose.yaml pull
-                docker compose -f /home/$APP_USER/docker-compose.yaml up -d --remove-orphans
-          EOF
-            ) & 
-            PIDS+=($!)
+                docker compose -f /home/$APP_USER/docker-compose.yaml down || true
+                # [중요] --wait 옵션 추가: 컨테이너가 완전히 뜰 때까지 대기 (안정성 확보)
+                docker compose -f /home/$APP_USER/docker-compose.yaml up -d --remove-orphans --wait
+            EOF
+            echo "✅ $IP 배포 완료"
+            sleep 3
           done
-          for PID in "${PIDS[@]}"; do wait $PID; done
           rm -f ./key.pem
-          echo "🎉 모든 배포 완료!"
+          echo "🎉 모든 서버 배포 완료!"
