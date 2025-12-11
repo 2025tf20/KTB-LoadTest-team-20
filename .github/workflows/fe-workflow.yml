@@ -104,7 +104,7 @@ jobs:
         run: |
           # 1. AWS CLI로 인스턴스 ID(IP) 가져오기 (TargetHealthDescriptions[*].Target.Id 사용)
           RAW_IDS=$(aws elbv2 describe-target-health \
-            --target-group-arn ${{ secrets.TARGET_GROUP_ARN }} \
+            --target-group-arn ${{ secrets.FE_TARGET_GROUP_ARN }} \
             --query 'TargetHealthDescriptions[*].Target.Id' \
             --output text)
           # 2. 결과값 정제
