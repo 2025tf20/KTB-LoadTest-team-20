@@ -8,8 +8,6 @@ services:
       - "5001:5001"
       - "5002:5002"
     restart: always
-    env_file:
-      - .env
     networks:
       - ktb-team20-backend
 
