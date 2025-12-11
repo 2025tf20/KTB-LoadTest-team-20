@@ -27,7 +27,7 @@ services:
       # 2. 도커 소켓 마운트 (컨테이너 메타데이터 수집용)
       - /var/run/docker.sock:/var/run/docker.sock
       # 3. Promtail 설정 파일 마운트
-      - ./promtail-config.yaml:/etc/promtail/config.yml
+      - /home/ubuntu/promtail-config.yaml:/etc/promtail/config.yml
     command: -config.file=/etc/promtail/config.yml
     restart: always
     networks:
