@@ -99,7 +99,7 @@ jobs:
           # 1. Target Group에서 Instance ID들 먼저 가져오기 (i-0xxxx 형태)
           # 결과 예시: i-07b76d... i-06e6c...
           INSTANCE_IDS=$(aws elbv2 describe-target-health \
-            --target-group-arn "${{ secrets.FE_TARGET_GROUP_ARN }}" \
+            --target-group-arn "${{ secrets.BE_TARGET_GROUP_ARN }}" \
             --query 'TargetHealthDescriptions[*].Target.Id' \
             --output text)
           if [ -z "$INSTANCE_IDS" ]; then
