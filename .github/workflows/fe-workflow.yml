@@ -99,18 +99,25 @@ jobs:
       - name: Download .env from S3
         run: aws s3 cp s3://${{ env.DEPLOY_BUCKET }}/frontend/docker-compose.yaml ./docker-compose.yaml
       # 3-5. 대상 그룹에서 배포 대상 인스턴스 (IP) 확인
-      - name: Get Instance IPs
+      - name: Get EC2 IPs from Target Group
         id: get-ips
         run: |
-          # 1. Target Group에서 Instance ID 조회
-          IDS=$(aws elbv2 describe-target-health --target-group-arn ${{ env.TARGET_GROUP_ARN }} --query 'TargetHealthDescriptions[*].Target.Id' --output text)
-          if [ -z "$IDS" ]; then echo "No instances"; exit 1; fi
-          # 2. Instance ID로 Public IP 조회 (결과값의 탭과 줄바꿈을 공백으로 치환)
-          IPS=$(aws ec2 describe-instances --instance-ids $IDS --query 'Reservations[*].Instances[*].PublicIpAddress' --output text | tr '\t' ' ' | tr '\n' ' ')
-          # 3. 앞뒤 불필요한 공백 제거 (xargs 사용) 및 출력
-          CLEAN_IPS=$(echo "$IPS" | xargs)
-          echo "Instance IPs: $CLEAN_IPS" # 디버깅용 출력
-          echo "instance_ips=$CLEAN_IPS" >> $GITHUB_OUTPUT
+          # 1. AWS CLI로 인스턴스 ID(IP) 가져오기 (TargetHealthDescriptions[*].Target.Id 사용)
+          RAW_IDS=$(aws elbv2 describe-target-health \
+            --target-group-arn ${{ secrets.TARGET_GROUP_ARN }} \
+            --query 'TargetHealthDescriptions[*].Target.Id' \
+            --output text)
+          # 2. 결과값 정제
+          # tr 명령어로 탭(\t)과 줄바꿈(\n)을 모두 스페이스( )로 바꿉니다.
+          CLEAN_IDS=$(echo "$RAW_IDS" | tr '\t' ' ' | tr '\n' ' ')
+          # 3. 빈 값 체크 (디버깅용)
+          if [ -z "$CLEAN_IDS" ]; then
+            echo "❌ Error: 타겟 그룹에서 인스턴스 IP를 찾을 수 없습니다."
+            exit 1
+          fi
+          echo "🔍 발견된 IPs: $CLEAN_IDS"
+          # 4. GitHub Actions Output에 저장 (한 줄로 깨끗하게 들어감)
+          echo "instance_ips=$CLEAN_IDS" >> $GITHUB_OUTPUT
       # 3-6. 배포
       - name: Deploy to all instances
         run: |
