@@ -147,7 +147,7 @@ jobs:
                 docker compose -f /home/$APP_USER/docker-compose.yaml down || true
                 # [중요] --wait 옵션 추가: 컨테이너가 완전히 뜰 때까지 대기 (안정성 확보)
                 docker compose -f /home/$APP_USER/docker-compose.yaml up -d --remove-orphans --wait
-            EOF
+          EOF
             echo "✅ $IP 배포 완료"
             sleep 3
           done
