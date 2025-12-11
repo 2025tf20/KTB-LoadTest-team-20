@@ -10,6 +10,8 @@ import com.ktb.chatapp.util.FileUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -54,6 +56,7 @@ public class UserService {
      * 현재 사용자 프로필 조회
      * @param email 사용자 이메일
      */
+    @Cacheable(value = "user:profile", key = "#email")
     public UserResponse getCurrentUserProfile(String email) {
         User user = userRepository.findByEmail(email.toLowerCase())
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
@@ -64,6 +67,7 @@ public class UserService {
      * 사용자 프로필 업데이트
      * @param email 사용자 이메일
      */
+    @CacheEvict(value = "user:profile", key = "#email")
     public UserResponse updateUserProfile(String email, UpdateProfileRequest request) {
         String normalizedEmail = email.toLowerCase();
         LocalDateTime now = LocalDateTime.now();
@@ -220,6 +224,7 @@ public class UserService {
      * 회원 탈퇴 처리
      * @param email 사용자 이메일
      */
+    @CacheEvict(value = "user:profile", key = "#email")
     public void deleteUserAccount(String email) {
         User user = userRepository.findByEmail(email.toLowerCase())
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));

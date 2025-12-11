@@ -282,22 +282,17 @@ public class RoomController {
     }
 
     private RoomResponse mapToRoomResponse(Room room, String name) {
-        User creator = userRepository.findById(room.getCreator()).orElse(null);
-        if (creator == null) {
-            throw new RuntimeException("Creator not found for room " + room.getId());
-        }
-        UserResponse creatorSummary = UserResponse.from(creator);
-        List<UserResponse> participantSummaries = room.getParticipantIds()
+        List<UserResponse> participantSummaries = userRepository.findAllById(room.getParticipantIds())
                 .stream()
-                .map(userRepository::findById).peek(optUser -> {
-                    if (optUser.isEmpty()) {
-                        log.warn("Participant not found: roomId={}, userId={}", room.getId(), optUser);
-                    }
-                })
-                .filter(Optional::isPresent)
-                .map(Optional::get)
                 .map(UserResponse::from)
                 .toList();
+
+        UserResponse creatorSummary = participantSummaries.stream()
+                .filter(p -> p.getId().equals(room.getCreator()))
+                .findFirst()
+                .orElseGet(() -> userRepository.findById(room.getCreator())
+                        .map(UserResponse::from)
+                        .orElseThrow(() -> new RuntimeException("Creator not found for room " + room.getId())));
 
         boolean isCreator = room.getCreator().equals(name);
 

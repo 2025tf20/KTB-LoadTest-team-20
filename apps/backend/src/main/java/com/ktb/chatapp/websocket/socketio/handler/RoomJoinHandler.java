@@ -58,11 +58,13 @@ public class RoomJoinHandler {
                 client.sendEvent(JOIN_ROOM_ERROR, Map.of("message", "User not found"));
                 return;
             }
-            
-            if (roomRepository.findById(roomId).isEmpty()) {
+
+            Optional<Room> roomOpt = roomRepository.findById(roomId);
+            if (roomOpt.isEmpty()) {
                 client.sendEvent(JOIN_ROOM_ERROR, Map.of("message", "채팅방을 찾을 수 없습니다."));
                 return;
             }
+            Room room = roomOpt.get();
             
             // 이미 해당 방에 참여 중인지 확인
             if (userRooms.isInRoom(userId, roomId)) {
@@ -74,6 +76,7 @@ public class RoomJoinHandler {
 
             // MongoDB의 $addToSet 연산자를 사용한 원자적 업데이트
             roomRepository.addParticipant(roomId, userId);
+            room.getParticipantIds().add(userId); // 이후 재조회 없이 참가자 정보 구성
 
             // Join socket room and add to user's room set
             client.joinRoom(roomId);
@@ -97,19 +100,9 @@ public class RoomJoinHandler {
             FetchMessagesRequest req = new FetchMessagesRequest(roomId, 30, null);
             FetchMessagesResponse messageLoadResult = messageLoader.loadMessages(req, userId);
 
-            // 업데이트된 room 다시 조회하여 최신 participantIds 가져오기
-            Optional<Room> roomOpt = roomRepository.findById(roomId);
-            if (roomOpt.isEmpty()) {
-                client.sendEvent(JOIN_ROOM_ERROR, Map.of("message", "채팅방을 찾을 수 없습니다."));
-                return;
-            }
-
             // 참가자 정보 조회
-            List<UserResponse> participants = roomOpt.get().getParticipantIds()
+            List<UserResponse> participants = userRepository.findAllById(room.getParticipantIds())
                     .stream()
-                    .map(userRepository::findById)
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
                     .map(UserResponse::from)
                     .toList();
             
