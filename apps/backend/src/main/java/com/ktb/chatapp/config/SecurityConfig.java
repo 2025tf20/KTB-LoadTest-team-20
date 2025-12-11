@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.filter.CorsFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -29,6 +30,7 @@ public class SecurityConfig {
     private final JwtDecoder jwtDecoder;
     private final CustomBearerTokenResolver bearerTokenResolver;
     private final SessionAwareJwtAuthenticationConverter jwtAuthenticationConverter;
+    private final LoggingFilter loggingFilter;
 
     private static final List<String> CORS_ALLOWED_ORIGINS = List.of("*");
 
@@ -87,13 +89,15 @@ public class SecurityConfig {
                                 .decoder(jwtDecoder)
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter)
                         )
-                );
+                )
+                .addFilterBefore(loggingFilter, CorsFilter.class);
         
         return http.build();
     }
 
     private CorsConfiguration createCorsConfiguration() {
         CorsConfiguration config = new CorsConfiguration();
+        /*
         if (CORS_ALLOWED_ORIGINS.contains("*")) {
             log.warn("╔═══════════════════════════════════════════════════════════════════════════════╗");
             log.warn("║                           ⚠️  CORS 보안 경고  ⚠️                              ║");
@@ -107,6 +111,7 @@ public class SecurityConfig {
             log.warn("║  💡 팀 도메인으로 CORS 설정하세요.         ║");
             log.warn("╚═══════════════════════════════════════════════════════════════════════════════╝");
         }
+        */
         config.setAllowedOriginPatterns(CORS_ALLOWED_ORIGINS);
         config.setAllowedMethods(CORS_ALLOWED_METHODS);
         config.setAllowedHeaders(CORS_ALLOWED_HEADERS);
