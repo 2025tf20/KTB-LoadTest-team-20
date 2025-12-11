@@ -13,7 +13,7 @@ import {
   VStack,
   Callout
 } from '@vapor-ui/core';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, withAuth } from '@/contexts/AuthContext';
 
 function NewChatRoom() {
   const router = useRouter();
@@ -201,4 +201,4 @@ function NewChatRoom() {
   );
 }
 
-export default NewChatRoom;
+export default withAuth(NewChatRoom);
