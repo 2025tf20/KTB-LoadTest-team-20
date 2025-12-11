@@ -77,6 +77,8 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
                     withCredentials: true
                 }
             );
+            console.log(uploadResponse.data);
+
 
             if (!uploadResponse.data.success) {
                 throw new Error(uploadResponse.data.message || '업로드 URL 생성 실패');

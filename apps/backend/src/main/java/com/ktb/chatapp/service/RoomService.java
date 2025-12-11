@@ -66,13 +66,16 @@ public class RoomService {
             );
 
             // 검색어가 있는 경우와 없는 경우 분리
-            Page<Room> roomPage;
+            Page<Room> roomPage =  roomRepository.findAll(springPageRequest);
+            /*
             if (pageRequest.getSearch() != null && !pageRequest.getSearch().trim().isEmpty()) {
                 roomPage = roomRepository.findByNameContainingIgnoreCase(
                     pageRequest.getSearch().trim(), springPageRequest);
             } else {
                 roomPage = roomRepository.findAll(springPageRequest);
             }
+
+             */
 
             // Room을 RoomResponse로 변환
             List<RoomResponse> roomResponses = roomPage.getContent().stream()

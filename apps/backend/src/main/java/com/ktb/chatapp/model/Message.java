@@ -38,7 +38,6 @@ public class Message {
     @Id
     private String id;
 
-    @Indexed
     @Field("room")
     private String roomId;
 
@@ -71,7 +70,6 @@ public class Message {
     @Builder.Default
     private Map<String, Object> metadata = new HashMap<>();
 
-    @Indexed
     @Builder.Default
     private Boolean isDeleted = false;
 
