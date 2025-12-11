@@ -123,10 +123,10 @@ public class UserController {
     @PostMapping("/profile-image")
     public ResponseEntity<?> uploadProfileImage(
             Principal principal,
-            @RequestParam("profileImage") MultipartFile file) {
+            @RequestParam("profileImage") String fileName) {
 
         try {
-            ProfileImageResponse response = userService.uploadProfileImage(principal.getName(), file);
+            ProfileImageResponse response = userService.uploadProfileImage(principal.getName(), fileName);
             return ResponseEntity.ok(response);
         } catch (UsernameNotFoundException e) {
             log.error("프로필 이미지 업로드 실패 - 사용자 없음: {}", e.getMessage());

@@ -1,6 +1,7 @@
 package com.ktb.chatapp.service;
 
 import com.ktb.chatapp.dto.ProfileImageResponse;
+import com.ktb.chatapp.dto.ProfileUploadDto;
 import com.ktb.chatapp.dto.UpdateProfileRequest;
 import com.ktb.chatapp.dto.UserResponse;
 import com.ktb.chatapp.model.User;
@@ -27,7 +28,8 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final FileService fileService;
+    //private final FileService fileService;
+    private final S3FileService s3FileService;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -71,33 +73,35 @@ public class UserService {
      * 프로필 이미지 업로드
      * @param email 사용자 이메일
      */
-    public ProfileImageResponse uploadProfileImage(String email, MultipartFile file) {
+    public ProfileImageResponse uploadProfileImage(String email, String fileName) {
         // 사용자 조회
         User user = userRepository.findByEmail(email.toLowerCase())
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
 
         // 파일 유효성 검증
-        validateProfileImageFile(file);
+        //validateProfileImageFile(file);
 
         // 기존 프로필 이미지 삭제
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
             deleteOldProfileImage(user.getProfileImage());
         }
 
-        // 새 파일 저장 (보안 검증 포함)
-        String profileImageUrl = fileService.storeFile(file, "profiles");
+        // 새 파일 저장
+        //String profileImageUrl = fileService.storeFile(file, "profiles");
+        ProfileUploadDto profileUploadDto = s3FileService.profileImageUpload(fileName);
 
         // 사용자 프로필 이미지 URL 업데이트
-        user.setProfileImage(profileImageUrl);
+        user.setProfileImage(profileUploadDto.getKey());
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
 
-        log.info("프로필 이미지 업로드 완료 - User ID: {}, File: {}", user.getId(), profileImageUrl);
+        log.info("프로필 이미지 업로드 완료 - User ID: {}, File: {}", user.getId(), profileUploadDto.getKey());
 
         return new ProfileImageResponse(
                 true,
                 "프로필 이미지가 업데이트되었습니다.",
-                profileImageUrl
+                profileUploadDto.getPresignedUrl(),
+                s3FileService.getPublicUrl(profileUploadDto.getKey())
         );
     }
 

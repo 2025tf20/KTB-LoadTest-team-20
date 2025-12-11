@@ -1,12 +1,13 @@
 package com.ktb.chatapp.controller;
 
+import com.ktb.chatapp.dto.ChatUploadDto;
+import com.ktb.chatapp.dto.PresignedUrlRequest;
 import com.ktb.chatapp.dto.StandardResponse;
 import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.User;
-import com.ktb.chatapp.repository.FileRepository;
 import com.ktb.chatapp.repository.UserRepository;
-import com.ktb.chatapp.service.FileService;
 import com.ktb.chatapp.service.FileUploadResult;
+import com.ktb.chatapp.service.S3FileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -37,13 +38,48 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/files")
 public class FileController {
 
-    private final FileService fileService;
-    private final FileRepository fileRepository;
+    //private final FileService fileService;
+    //private final FileRepository fileRepository;
     private final UserRepository userRepository;
+    private final S3FileService s3FileService;
+    // FileController.java
+
+    @PostMapping("/presigned-url")
+    public ResponseEntity<?> getPresignedUrl(
+            @RequestBody PresignedUrlRequest request,
+            Principal principal
+    ) {
+        ChatUploadDto result = s3FileService.chatFileUpload(
+                request.getFileName(),
+                request.getFileSize(),
+                request.getMimeType()
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "presignedUrl", result.getPresignedUrl(),
+                "file", result.getFile()
+        ));
+    }
+
+    @GetMapping("/download-url/{key}")
+    public ResponseEntity<?> getDownloadUrl(
+            @PathVariable String key,
+            Principal principal
+    ) {
+        // 권한 검증 (메시지 조회해서 채팅방 참가자인지 확인)
+        String downloadUrl = s3FileService.generatePresignedGetUrl(key);
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "url", downloadUrl
+        ));
+    }
 
     /**
      * 파일 업로드
      */
+    /*
     @Operation(summary = "파일 업로드", description = "파일을 업로드합니다. 최대 50MB까지 가능합니다.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "파일 업로드 성공"),
@@ -56,15 +92,16 @@ public class FileController {
         @ApiResponse(responseCode = "500", description = "서버 내부 오류",
             content = @Content(schema = @Schema(implementation = StandardResponse.class)))
     })
+
     @PostMapping("/upload")
     public ResponseEntity<?> uploadFile(
-            @Parameter(description = "업로드할 파일") @RequestParam("file") MultipartFile file,
+            @Parameter(description = "업로드할 파일") @RequestParam("file") String fileName,
             Principal principal) {
         try {
             User user = userRepository.findByEmail(principal.getName())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
 
-            FileUploadResult result = fileService.uploadFile(file, user.getId());
+            FileUploadResult result = fileService.uploadFile(, user.getId());
 
             if (result.isSuccess()) {
                 Map<String, Object> response = new HashMap<>();
@@ -99,9 +136,12 @@ public class FileController {
         }
     }
 
+     */
+
     /**
      * 보안이 강화된 파일 다운로드
      */
+    /*
     @Operation(summary = "파일 다운로드", description = "업로드된 파일을 다운로드합니다. 본인이 업로드한 파일만 다운로드 가능합니다.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "파일 다운로드 성공"),
@@ -152,6 +192,8 @@ public class FileController {
             return handleFileError(e);
         }
     }
+
+
 
     private ResponseEntity<?> handleFileError(Exception e) {
         String errorMessage = e.getMessage();
@@ -276,5 +318,5 @@ public class FileController {
             errorResponse.put("error", errorMessage);
             return ResponseEntity.status(500).body(errorResponse);
         }
-    }
+    }*/
 }

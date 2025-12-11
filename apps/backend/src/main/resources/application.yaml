@@ -89,3 +89,13 @@ management:
     tags:
       application: ${spring.application.name:ktb-chat-backend}
       host: ${HOSTNAME:unknown}
+
+cloud:
+  aws:
+    credentials:
+      access-key: ${ACCESS_KEY}
+      secret-key: ${SECRET_KEY}
+    region:
+      static: ${S3_REGION}
+    s3:
+      bucket: ${S3_BUCKET_NAME}

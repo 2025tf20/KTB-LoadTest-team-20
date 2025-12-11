@@ -14,25 +14,22 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FileResponse {
-    @JsonProperty("_id")
-    private String id;
-    private String filename;
-    private String originalname;
+    private String fileUrl;
+    private String fileName;
     private String mimetype;
     private long size;
     private String user;
     private LocalDateTime uploadDate;
 
     // File 엔티티에서 FileResponse로 변환하는 정적 메서드
-    public static FileResponse from(File file) {
+    public static FileResponse from(File file, String url, String user, LocalDateTime uploadDate) {
         return FileResponse.builder()
-                .id(file.getId())
-                .filename(file.getFilename())
-                .originalname(file.getOriginalname())
+                .fileName(file.getOriginalName())
+                .fileUrl(url)
+                .user(user)
                 .mimetype(file.getMimetype())
                 .size(file.getSize())
-                .user(file.getUser())
-                .uploadDate(file.getUploadDate())
+                .uploadDate(uploadDate)
                 .build();
     }
 }
