@@ -10,6 +10,26 @@ services:
     restart: always
     env_file:
       - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - ktb-team20-backend
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: ktb-team20-promtail
+    volumes:
+      # 1. 호스트의 도커 로그 저장소를 읽기 전용으로 마운트 (가장 중요)
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # 2. 도커 소켓 마운트 (컨테이너 메타데이터 수집용)
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 3. Promtail 설정 파일 마운트
+      - ./promtail-config.yaml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    restart: always
     networks:
       - ktb-team20-backend
 
