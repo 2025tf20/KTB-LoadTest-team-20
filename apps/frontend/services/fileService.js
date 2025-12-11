@@ -79,7 +79,7 @@ class FileService {
         try {
             // 1. 백엔드에서 Presigned PUT URL 받기
             const presignedResponse = await axiosInstance.post(
-                `${this.baseUrl}/api/files/presigned-url`,
+                `${this.baseUrl}/api/files/upload`,
                 {
                     fileName: file.name,
                     fileSize: file.size,

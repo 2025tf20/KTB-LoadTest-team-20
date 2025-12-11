@@ -44,7 +44,7 @@ public class FileController {
     private final S3FileService s3FileService;
     // FileController.java
 
-    @PostMapping("/presigned-url")
+    @PostMapping("/upload")
     public ResponseEntity<?> getPresignedUrl(
             @RequestBody PresignedUrlRequest request,
             Principal principal
