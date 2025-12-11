@@ -69,34 +69,36 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
             }
 
 
-            //    await axiosInstance.post(
-            //    `${process.env.NEXT_PUBLIC_API_URL}/api/users/profile-image`,
-            //    null,
-            //    {
-            //        params: { profileImage: file.name },
-            //        withCredentials: true
-            //    }
-            //);
+                await axiosInstance.post(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/users/profile-image`,
+                null,
+                {
+                    params: { profileImage: file.name },
+                    withCredentials: true
+                }
+            );
 
             if (!uploadResponse.data.success) {
                 throw new Error(uploadResponse.data.message || '업로드 URL 생성 실패');
             }
 
             const { presignedUrl, imageUrl } = uploadResponse.data;
-
+/*
             // 2. S3에 직접 업로드
-            //await axios.put(presignedUrl, file, {
-            //    headers: {
-            //        'Content-Type': file.type
-            //    }
-            //});
+            await axios.put(presignedUrl, file, {
+                headers: {
+                    'Content-Type': file.type
+                }
+            });
+
+ */
 
             // 3. 로컬 스토리지의 사용자 정보 업데이트
-            //const updatedUser = {
-            //    ...user,
-            //    profileImage: imageUrl
-            //};
-            //localStorage.setItem('user', JSON.stringify(updatedUser));
+            const updatedUser = {
+                ...user,
+                profileImage: imageUrl
+            };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
 
             // 4. S3 URL로 미리보기 업데이트
             URL.revokeObjectURL(objectUrl);
@@ -133,8 +135,7 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
     const handleRemoveImage = async () => {
         try {
             setUploading(true);
-            setError('');
-/*
+            setError('')
             // 백엔드에 프로필 이미지 제거 요청
             const response = await axiosInstance.delete(
                 `${process.env.NEXT_PUBLIC_API_URL}/api/users/profile-image`,
@@ -156,7 +157,6 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
             if (previewUrl && previewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(previewUrl);
             }
-*/
             setPreviewUrl(null);
             onImageChange('');
 
@@ -201,7 +201,7 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
                     data-testid="profile-image-upload-button"
                 >
                     <CameraIcon />
-                    {uploading ? '업로드 중...' : '이미지 변경'}
+                    이미지 변경
                 </Button>
 
                 {previewUrl && (

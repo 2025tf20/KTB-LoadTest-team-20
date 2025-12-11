@@ -129,6 +129,7 @@ const FileMessage = ({
                         setError("이미지를 불러올 수 없습니다 우히히.");
                     }}
                     loading="lazy"
+                    data-testid="file-image-preview"
                 />
             </div>
         );
@@ -212,7 +213,7 @@ const FileMessage = ({
     };
 
     return (
-        <div className="my-4" ref={messageDomRef}>
+        <div className="my-4" ref={messageDomRef} data-testid="file-message-container">
             <VStack
                 className={`max-w-[65%] ${isMine ? "ml-auto items-end" : "mr-auto items-start"}`}
                 gap="$100"
