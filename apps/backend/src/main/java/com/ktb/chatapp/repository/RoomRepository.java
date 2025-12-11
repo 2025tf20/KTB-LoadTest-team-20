@@ -17,7 +17,7 @@ public interface RoomRepository extends MongoRepository<Room, String> {
     Page<Room> findAll(Pageable pageable);
 
     // 검색어와 함께 페이지네이션 조회
-    Page<Room> findByNameContainingIgnoreCase(String name, Pageable pageable);
+    //Page<Room> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
     // 가장 최근에 생성된 방 조회 (Health Check용)
     @Query(value = "{}", sort = "{ 'createdAt': -1 }")

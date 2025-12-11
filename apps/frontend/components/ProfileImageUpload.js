@@ -68,7 +68,7 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
                 }
             }
 
-            /*
+
                 await axiosInstance.post(
                 `${process.env.NEXT_PUBLIC_API_URL}/api/users/profile-image`,
                 null,
@@ -77,7 +77,8 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
                     withCredentials: true
                 }
             );
-            */
+            console.log(uploadResponse.data);
+
 
             if (!uploadResponse.data.success) {
                 throw new Error(uploadResponse.data.message || '업로드 URL 생성 실패');

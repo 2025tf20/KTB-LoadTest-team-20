@@ -22,15 +22,11 @@ import org.springframework.data.mongodb.core.mapping.Field;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "rooms")
-@CompoundIndexes({
-    @CompoundIndex(name = "name_createdAt_idx", def = "{'name': 1, 'createdAt': -1}")
-})
 public class Room {
 
     @Id
     private String id;
 
-    @Indexed
     private String name;
 
     private String creator;
