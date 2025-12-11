@@ -102,10 +102,15 @@ jobs:
       - name: Get Instance IPs
         id: get-ips
         run: |
+          # 1. Target Group에서 Instance ID 조회
           IDS=$(aws elbv2 describe-target-health --target-group-arn ${{ env.TARGET_GROUP_ARN }} --query 'TargetHealthDescriptions[*].Target.Id' --output text)
           if [ -z "$IDS" ]; then echo "No instances"; exit 1; fi
-          IPS=$(aws ec2 describe-instances --instance-ids $IDS --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
-          echo "instance_ips=$IPS" >> $GITHUB_OUTPUT
+          # 2. Instance ID로 Public IP 조회 (결과값의 탭과 줄바꿈을 공백으로 치환)
+          IPS=$(aws ec2 describe-instances --instance-ids $IDS --query 'Reservations[*].Instances[*].PublicIpAddress' --output text | tr '\t' ' ' | tr '\n' ' ')
+          # 3. 앞뒤 불필요한 공백 제거 (xargs 사용) 및 출력
+          CLEAN_IPS=$(echo "$IPS" | xargs)
+          echo "Instance IPs: $CLEAN_IPS" # 디버깅용 출력
+          echo "instance_ips=$CLEAN_IPS" >> $GITHUB_OUTPUT
       # 3-6. 배포
       - name: Deploy to all instances
         run: |
