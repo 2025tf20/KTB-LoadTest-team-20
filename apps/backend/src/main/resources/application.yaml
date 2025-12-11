@@ -48,7 +48,6 @@ logging:
     org:
       springframework: INFO
       mongodb: INFO
-    org.springframework.data.mongodb.core.MongoTemplate: DEBUG  # ✅ 여기로
     com:
       ktb:
         chatapp: INFO
