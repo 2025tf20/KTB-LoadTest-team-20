@@ -3,12 +3,15 @@ package com.ktb.chatapp.websocket.socketio.handler;
 import com.ktb.chatapp.dto.FileResponse;
 import com.ktb.chatapp.dto.MessageResponse;
 import com.ktb.chatapp.dto.UserResponse;
+import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.User;
-import com.ktb.chatapp.repository.FileRepository;
+
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Optional;
+
+import com.ktb.chatapp.service.S3FileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,8 +24,9 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class MessageResponseMapper {
+    private final S3FileService s3FileService;
 
-    private final FileRepository fileRepository;
+    //private final FileRepository fileRepository;
 
     /**
      * Message 엔티티를 MessageResponse DTO로 변환
@@ -32,6 +36,7 @@ public class MessageResponseMapper {
      * @return MessageResponse DTO
      */
     public MessageResponse mapToMessageResponse(Message message, User sender) {
+
         MessageResponse.MessageResponseBuilder builder = MessageResponse.builder()
                 .id(message.getId())
                 .content(message.getContent())
@@ -42,7 +47,9 @@ public class MessageResponseMapper {
                         message.getReactions() : new HashMap<>())
                 .readers(message.getReaders() != null ?
                         message.getReaders() : new ArrayList<>());
-
+        if(message.getFile() != null){
+            builder.file(mapToFileResponse(message.getFile(), "", message.getTimestamp()));
+        }
         // 발신자 정보 설정
         if (sender != null) {
             builder.sender(UserResponse.builder()
@@ -53,6 +60,7 @@ public class MessageResponseMapper {
                     .build());
         }
 
+        /*
         // 파일 정보 설정
         Optional.ofNullable(message.getFileId())
                 .flatMap(fileRepository::findById)
@@ -69,7 +77,12 @@ public class MessageResponseMapper {
         if (message.getMetadata() != null) {
             builder.metadata(message.getMetadata());
         }
+        *
+         */
 
         return builder.build();
+    }
+    public FileResponse mapToFileResponse(File file, String sender, LocalDateTime uploadDate) {
+        return FileResponse.from(file, s3FileService.getPublicUrl(file.getKey()), sender, uploadDate);
     }
 }

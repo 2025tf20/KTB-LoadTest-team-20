@@ -1,6 +1,7 @@
 package com.ktb.chatapp.service;
 
 import com.ktb.chatapp.dto.ProfileImageResponse;
+import com.ktb.chatapp.dto.ProfileUploadDto;
 import com.ktb.chatapp.dto.UpdateProfileRequest;
 import com.ktb.chatapp.dto.UserResponse;
 import com.ktb.chatapp.model.User;
@@ -33,8 +34,11 @@ import org.springframework.data.mongodb.core.query.Update;
 public class UserService {
 
     private final UserRepository userRepository;
+
+    private final S3FileService s3FileService;
+
     private final MongoTemplate mongoTemplate;
-    private final FileService fileService;
+
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -89,13 +93,12 @@ public class UserService {
      * 프로필 이미지 업로드
      * @param email 사용자 이메일
      */
-    public ProfileImageResponse uploadProfileImage(String email, MultipartFile file) {
-        
-        validateProfileImageFile(file);
+    public ProfileImageResponse uploadProfileImage(String email, String fileName) {
+
+        ProfileUploadDto profileUploadDto = s3FileService.profileImageUpload(fileName);
 
         String normalizedEmail = email.toLowerCase();
 
-        String profileImageUrl = fileService.storeFile(file, "profiles");
         LocalDateTime now = LocalDateTime.now();
 
         Query query = new Query(
@@ -103,7 +106,7 @@ public class UserService {
         );
 
         Update update = new Update()
-            .set("profileImage", profileImageUrl)
+            .set("profileImage", profileUploadDto.getKey())
             .set("updatedAt",now);
 
         FindAndModifyOptions options = FindAndModifyOptions.options()
@@ -113,9 +116,9 @@ public class UserService {
         
         if(previousUser == null){
             try {
-                deleteOldProfileImage(profileImageUrl);
+                //deleteOldProfileImage(profileImageUrl);
             } catch (Exception e){
-                log.warn("사용자 없음으로 인해 업로드된 고아 파일 삭제 실패: {}", profileImageUrl, e);
+                log.warn("사용자 없음으로 인해 업로드된 고아 파일 삭제 실패: {}");
             }
             
             throw new UsernameNotFoundException("사용자를 찾을 수 없습니다.");
@@ -123,16 +126,14 @@ public class UserService {
 
         String oldProfileImage = previousUser.getProfileImage();
         if(oldProfileImage != null && !oldProfileImage.isEmpty()){
-            deleteOldProfileImage(oldProfileImage);
+            //deleteOldProfileImage(oldProfileImage);
         }
-
-        log.info("프로필 이미지 업로드 완료 - User ID: {}, File: {}",
-                previousUser.getId(), profileImageUrl);
 
         return new ProfileImageResponse(
                 true,
                 "프로필 이미지가 업데이트되었습니다.",
-                profileImageUrl
+                profileUploadDto.getPresignedUrl(),
+                s3FileService.getPublicUrl(profileUploadDto.getKey())
         );
     }
 

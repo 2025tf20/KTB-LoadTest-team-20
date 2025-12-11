@@ -169,6 +169,8 @@ export const useChatRoom = () => {
   // 메시지 처리 유틸리티 함수
   const processMessages = useCallback((loadedMessages, hasMore, isInitialLoad = false) => {
     try {
+        console.log(loadedMessages);
+        console.log("processMessages");
       if (!Array.isArray(loadedMessages)) {
         throw new Error('Invalid messages format');
       }
@@ -247,6 +249,7 @@ export const useChatRoom = () => {
 
     // 메시지 이벤트
     socketRef.current.on('message', message => {
+        console.log("메시지!")
       if (!message || !mountedRef.current || messageProcessingRef.current || !message._id) return;
       
       if (processedMessageIds.current.has(message._id)) {

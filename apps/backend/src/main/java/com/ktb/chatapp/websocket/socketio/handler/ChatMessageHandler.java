@@ -3,22 +3,14 @@ package com.ktb.chatapp.websocket.socketio.handler;
 import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.SocketIOServer;
 import com.corundumstudio.socketio.annotation.OnEvent;
-import com.ktb.chatapp.dto.ChatMessageRequest;
-import com.ktb.chatapp.dto.FileResponse;
-import com.ktb.chatapp.dto.MessageContent;
-import com.ktb.chatapp.dto.MessageResponse;
-import com.ktb.chatapp.dto.UserResponse;
+import com.ktb.chatapp.dto.*;
 import com.ktb.chatapp.model.*;
-import com.ktb.chatapp.repository.FileRepository;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
+import com.ktb.chatapp.service.*;
 import com.ktb.chatapp.util.BannedWordChecker;
 import com.ktb.chatapp.websocket.socketio.ai.AiService;
-import com.ktb.chatapp.service.SessionService;
-import com.ktb.chatapp.service.SessionValidationResult;
-import com.ktb.chatapp.service.RateLimitService;
-import com.ktb.chatapp.service.RateLimitCheckResult;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -42,12 +34,13 @@ public class ChatMessageHandler {
     private final MessageRepository messageRepository;
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
-    private final FileRepository fileRepository;
+    //private final FileRepository fileRepository;
     private final AiService aiService;
     private final SessionService sessionService;
     private final BannedWordChecker bannedWordChecker;
     private final RateLimitService rateLimitService;
     private final MeterRegistry meterRegistry;
+    private final S3FileService s3FileService;
     
     @OnEvent(CHAT_MESSAGE)
     public void handleChatMessage(SocketIOClient client, ChatMessageRequest data) {
@@ -148,7 +141,12 @@ public class ChatMessageHandler {
 
             String messageType = data.getMessageType();
             Message message = switch (messageType) {
-                case "file" -> handleFileMessage(roomId, socketUser.id(), messageContent, data.getFileData());
+                case "file" -> handleFileMessage(
+                        roomId,
+                        socketUser.id(),
+                        messageContent,
+                        data.getFileData()  // ← FileDataRequest 객체 통째로 전달
+                );
                 case "text" -> handleTextMessage(roomId, socketUser.id(), messageContent);
                 default -> throw new IllegalArgumentException("Unsupported message type: " + messageType);
             };
@@ -158,8 +156,19 @@ public class ChatMessageHandler {
                 timerSample.stop(createTimer("ignored", messageType));
                 return;
             }
+            if ("file".equals(data.getType())) {
+                log.debug("📥 File message received: type={}, hasFileData={}, fileData={}",
+                        data.getType(),
+                        data.getFileData() != null,
+                        data.getFileData());
+            }
 
             Message savedMessage = messageRepository.save(message);
+
+            log.debug("📤 Saved message: id={}, type={}, hasFile={}",
+                    savedMessage.getId(),
+                    savedMessage.getType(),
+                    savedMessage.getFile() != null);
 
             socketIOServer.getRoomOperations(roomId)
                     .sendEvent(MESSAGE, createMessageResponse(savedMessage, sender));
@@ -187,33 +196,27 @@ public class ChatMessageHandler {
         }
     }
 
-    private Message handleFileMessage(String roomId, String userId, MessageContent messageContent, Map<String, Object> fileData) {
-        if (fileData == null || fileData.get("_id") == null) {
+    private Message handleFileMessage(String roomId, String userId, MessageContent messageContent,
+                                      ChatMessageRequest.FileDataRequest fileData) {
+        if (fileData == null || fileData.getKey() == null) {
             throw new IllegalArgumentException("파일 데이터가 올바르지 않습니다.");
         }
 
-        String fileId = (String) fileData.get("_id");
-        File file = fileRepository.findById(fileId).orElse(null);
-
-        if (file == null || !file.getUser().equals(userId)) {
-            throw new IllegalStateException("파일을 찾을 수 없거나 접근 권한이 없습니다.");
-        }
+        // ✅ 프론트에서 받은 S3 key로 File 객체 생성
+        File file = new File();
+        file.setKey(fileData.getKey());
+        file.setOriginalName(fileData.getOriginalName());
+        file.setMimetype(fileData.getMimetype());
+        file.setSize(fileData.getSize());
 
         Message message = new Message();
         message.setRoomId(roomId);
         message.setSenderId(userId);
         message.setType(MessageType.file);
-        message.setFileId(fileId);
+        message.setFile(file);  // ✅ File 객체 설정
         message.setContent(messageContent.getTrimmedContent());
         message.setTimestamp(LocalDateTime.now());
         message.setMentions(messageContent.aiMentions());
-        
-        // 메타데이터는 Map<String, Object>
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("fileType", file.getMimetype());
-        metadata.put("fileSize", file.getSize());
-        metadata.put("originalName", file.getOriginalname());
-        message.setMetadata(metadata);
 
         return message;
     }
@@ -244,12 +247,10 @@ public class ChatMessageHandler {
         messageResponse.setReactions(message.getReactions() != null ? message.getReactions() : Collections.emptyMap());
         messageResponse.setSender(UserResponse.from(sender));
         messageResponse.setMetadata(message.getMetadata());
-
-        if (message.getFileId() != null) {
-            fileRepository.findById(message.getFileId())
-                    .ifPresent(file -> messageResponse.setFile(FileResponse.from(file)));
+        if(message.getFile() != null){
+            File file = message.getFile();
+            messageResponse.setFile(FileResponse.from(file, s3FileService.getPublicUrl(file.getKey()), sender.getName(), message.getTimestamp()));
         }
-
         return messageResponse;
     }
 

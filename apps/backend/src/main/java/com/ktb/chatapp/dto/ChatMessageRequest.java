@@ -7,52 +7,51 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class ChatMessageRequest {
-
     private String room;
     private String type;
     private String content;
-    private String msg;
-    private Map<String, Object> fileData;
+    private FileDataRequest fileData;  // ← 추가!
 
-    /**
-     * Content 필드가 비어있으면 msg 필드를 반환하는 정규화된 content를 제공
-     */
+    @Data
+    public static class FileDataRequest {
+        private String key;              // S3 key
+        private String originalName;
+        private String mimetype;
+        private Long size;
+    }
     public String getNormalizedContent() {
         if (content != null && !content.trim().isEmpty()) {
             return content;
         }
-        return msg != null ? msg : "";
+        return "";
     }
-    
-    /**
-     * 파싱된 메시지 내용 객체 반환 (AI 멘션 추출 포함)
-     */
     public MessageContent getParsedContent() {
         return MessageContent.from(getNormalizedContent());
     }
 
-    /**
-     * 메시지 타입을 반환 (기본값: "text")
-     */
     public String getMessageType() {
         return type != null ? type : "text";
     }
 
-    /**
-     * fileData가 존재하는지 확인
-     */
     public boolean hasFileData() {
-        return fileData != null && !fileData.isEmpty();
+        return fileData != null && fileData.getKey() != null;
     }
 
-    public String getRoom() {
-        if (room == null || room.trim().isEmpty()) {
-            throw new IllegalArgumentException("채팅방 정보가 없습니다.");
-        }
-        return room;
+    // fileData에서 값 가져오는 헬퍼 메서드
+    public String getFileName() {
+        return hasFileData() ? fileData.getOriginalName() : null;
+    }
+
+    public Long getSize() {
+        return hasFileData() ? fileData.getSize() : null;
+    }
+
+    public String getMimeType() {
+        return hasFileData() ? fileData.getMimetype() : null;
+    }
+
+    public String getFileKey() {
+        return hasFileData() ? fileData.getKey() : null;
     }
 }
