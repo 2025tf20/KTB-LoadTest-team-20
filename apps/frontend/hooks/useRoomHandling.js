@@ -381,7 +381,7 @@ export const useRoomHandling = (
         if (mountedRef.current && socketRef.current?.connected) {
           await joinRoom(router.query.room);
 
-          await loadInitialMessages(router.query.room);
+          // await loadInitialMessages(router.query.room);
         }
 
         if (mountedRef.current) {

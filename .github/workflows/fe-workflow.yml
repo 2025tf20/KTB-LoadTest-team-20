@@ -99,35 +99,56 @@ jobs:
       - name: Download .env from S3
         run: aws s3 cp s3://${{ env.DEPLOY_BUCKET }}/frontend/docker-compose.yaml ./docker-compose.yaml
       # 3-5. 대상 그룹에서 배포 대상 인스턴스 (IP) 확인
-      - name: Get Instance IPs
+      - name: Get EC2 IPs from Target Group
         id: get-ips
         run: |
-          IDS=$(aws elbv2 describe-target-health --target-group-arn ${{ env.TARGET_GROUP_ARN }} --query 'TargetHealthDescriptions[*].Target.Id' --output text)
-          if [ -z "$IDS" ]; then echo "No instances"; exit 1; fi
-          IPS=$(aws ec2 describe-instances --instance-ids $IDS --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
-          echo "instance_ips=$IPS" >> $GITHUB_OUTPUT
+          # 1. Target Group에서 Instance ID들 먼저 가져오기 (i-0xxxx 형태)
+          # 결과 예시: i-07b76d... i-06e6c...
+          INSTANCE_IDS=$(aws elbv2 describe-target-health \
+            --target-group-arn "${{ secrets.FE_TARGET_GROUP_ARN }}" \
+            --query 'TargetHealthDescriptions[*].Target.Id' \
+            --output text)
+          if [ -z "$INSTANCE_IDS" ]; then
+            echo "❌ Error: 타겟 그룹에 연결된 인스턴스가 없습니다."
+            exit 1
+          fi
+          echo "🔍 감지된 Instance IDs: $INSTANCE_IDS"
+          # 2. [핵심] Instance ID를 가지고 -> 'Public IP' 조회하기
+          # aws ec2 describe-instances 명령어를 사용합니다.
+          PUBLIC_IPS=$(aws ec2 describe-instances \
+            --instance-ids $INSTANCE_IDS \
+            --query "Reservations[*].Instances[*].PublicIpAddress" \
+            --output text)
+          # 3. 결과값 정제 (탭/줄바꿈 -> 공백)
+          CLEAN_IPS=$(echo "$PUBLIC_IPS" | tr '\t' ' ' | tr '\n' ' ')
+          if [ -z "$CLEAN_IPS" ]; then
+             echo "❌ Error: 인스턴스 ID는 찾았으나 Public IP를 가져오지 못했습니다. (Private Subnet에 있나요?)"
+             exit 1
+          fi
+          echo "✅ 최종 추출된 Public IPs: $CLEAN_IPS"
+          echo "instance_ips=$CLEAN_IPS" >> $GITHUB_OUTPUT
       # 3-6. 배포
       - name: Deploy to all instances
         run: |
           IFS=' ' read -r -a IPS <<< "${{ steps.get-ips.outputs.instance_ips }}"
-          PIDS=()
           for IP in "${IPS[@]}"; do
-            echo "🚀 배포 시작: $IP"
-            (
-              # 1. 파일 직접 던져주기 (SCP)
-              scp -i ./key.pem -o StrictHostKeyChecking=no ./docker-compose.yaml $APP_USER@$IP:/home/$APP_USER/docker-compose.yaml
-              # 2. 원격 접속해서 실행만 시키기 (SSH)
-              ssh -i ./key.pem -o StrictHostKeyChecking=no $APP_USER@$IP << EOF
+            echo "--------------------------------------------------"
+            echo "🚀 [순차 배포 시작] 대상 IP: $IP"
+            # 1. 파일 전송 (SCP)
+            scp -i ./key.pem -o StrictHostKeyChecking=no ./docker-compose.yaml $APP_USER@$IP:/home/$APP_USER/docker-compose.yaml     
+            # 2. 원격 접속 및 실행 (SSH)
+            ssh -i ./key.pem -o StrictHostKeyChecking=no $APP_USER@$IP << EOF
                 set -e
                 echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+                # 이미지 태그 변경
                 sed -i 's|{{IMAGE_TAG}}|$IMAGE_TAG|g' /home/$APP_USER/docker-compose.yaml
-                docker compose -f /home/$APP_USER/docker-compose.yaml down || true
+                # 배포 명령
                 docker compose -f /home/$APP_USER/docker-compose.yaml pull
-                docker compose -f /home/$APP_USER/docker-compose.yaml up -d --remove-orphans
+                docker compose -f /home/$APP_USER/docker-compose.yaml down || true
+                docker compose -f /home/$APP_USER/docker-compose.yaml up -d --remove-orphans --wait
           EOF
-            ) & 
-            PIDS+=($!)
+            echo "✅ $IP 배포 완료"
+            sleep 3
           done
-          for PID in "${PIDS[@]}"; do wait $PID; done
           rm -f ./key.pem
-          echo "🎉 모든 배포 완료!"
+          echo "🎉 모든 서버 배포 완료!"
