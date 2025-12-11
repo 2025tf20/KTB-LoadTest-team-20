@@ -1,12 +1,20 @@
 package com.ktb.chatapp.websocket.socketio.handler;
 
 import com.corundumstudio.socketio.SocketIOClient;
+import com.corundumstudio.socketio.SocketIOServer;
 import com.corundumstudio.socketio.annotation.OnEvent;
 import com.ktb.chatapp.dto.FetchMessagesRequest;
 import com.ktb.chatapp.dto.FetchMessagesResponse;
+import com.ktb.chatapp.dto.MessageResponse;
+import com.ktb.chatapp.dto.MessagesReadResponse;
+import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.repository.RoomRepository;
+import com.ktb.chatapp.service.MessageReadStatusService;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +33,10 @@ import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.*;
 @RequiredArgsConstructor
 public class MessageFetchHandler {
 
+    private final SocketIOServer socketIOServer;
     private final RoomRepository roomRepository;
     private final MessageLoader messageLoader;
+    private final MessageReadStatusService messageReadStatusService;
 
     @OnEvent(FETCH_PREVIOUS_MESSAGES)
     public void handleFetchMessages(SocketIOClient client, FetchMessagesRequest data) {
@@ -59,11 +69,34 @@ public class MessageFetchHandler {
             log.debug("Loading messages for room {}", data.roomId());
             FetchMessagesResponse result = messageLoader.loadMessages(data, userId);
             
+            // 읽음 처리
+            List<String> messageIds = new ArrayList<String>();
+            List<MessageResponse> messageResponses = result.getMessages();
+            for(MessageResponse messageResponse : messageResponses){
+                boolean flag = false;
+                List<Message.MessageReader> readers = messageResponse.getReaders();
+                for(Message.MessageReader reader : readers){
+                    if(reader.getUserId() == userId) flag = true;
+                }
+                if(flag) continue;
+                messageIds.add(messageResponse.getId());
+            }
+            messageReadStatusService.updateReadStatus(messageIds, userId);
+
+            // 다시 읽어오기
+            result = messageLoader.loadMessages(data,userId);
+
             log.debug("Previous messages loaded - room: {}, count: {}, hasMore: {}",
                     data.roomId(), result.getMessages().size(),
                     result.isHasMore());
             
             client.sendEvent(PREVIOUS_MESSAGES_LOADED, result);
+            
+            MessagesReadResponse response = new MessagesReadResponse(userId, messageIds);
+
+            String roomId = data.roomId();
+            socketIOServer.getRoomOperations(roomId)
+                    .sendEvent(MESSAGES_READ, response);
 
         } catch (Exception e) {
             log.error("Error handling fetchPreviousMessages", e);
