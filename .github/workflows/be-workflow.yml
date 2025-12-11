@@ -92,6 +92,7 @@ jobs:
         run: |
           aws s3 cp s3://${{ env.DEPLOY_BUCKET }}/backend/.env ./.env
           aws s3 cp s3://${{ env.DEPLOY_BUCKET }}/backend/docker-compose.yaml ./docker-compose.yaml
+          aws s3 cp s3://${{ env.DEPLOY_BUCKET }}/backend/promtail-config.yaml ./promtail-config.yaml
       # 3-5. 대상 그룹에서 배포 대상 인스턴스 (IP) 확인
       - name: Get EC2 IPs from Target Group
         id: get-ips
@@ -130,6 +131,7 @@ jobs:
             echo "🚀 [순차 배포 시작] 대상 IP: $IP"
             # 1. 파일 전송 (SCP)
             scp -i ./key.pem -o StrictHostKeyChecking=no ./docker-compose.yaml $APP_USER@$IP:/home/$APP_USER/docker-compose.yaml
+            scp -i ./key.pem -o StrictHostKeyChecking=no ./promtail-config.yaml $APP_USER@$IP:/home/$APP_USER/./promtail-config.yaml
             scp -i ./key.pem -o StrictHostKeyChecking=no ./.env $APP_USER@$IP:/home/$APP_USER/.env  
             # 2. 원격 접속 및 실행 (SSH)
             ssh -i ./key.pem -o StrictHostKeyChecking=no $APP_USER@$IP << EOF
