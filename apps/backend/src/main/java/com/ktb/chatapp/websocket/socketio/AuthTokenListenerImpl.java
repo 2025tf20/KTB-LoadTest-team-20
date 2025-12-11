@@ -46,11 +46,21 @@ public class AuthTokenListenerImpl implements AuthTokenListener {
             }
 
             String userId;
+            String sessionIdFromToken = null;
             try {
                 userId = jwtService.extractUserId(token);
+                sessionIdFromToken = jwtService.extractSessionId(token);
             } catch (JwtException e) {
                 return new AuthTokenResult(false, Map.of("message", "Invalid token"));
             }
+
+            // Prefer the sessionId embedded in JWT to avoid stale client state
+            if (sessionIdFromToken != null && !sessionIdFromToken.equals(sessionId)) {
+                log.warn("Socket auth sessionId mismatch, using token sessionId instead. provided={}, token={}",
+                        sessionId, sessionIdFromToken);
+                sessionId = sessionIdFromToken;
+            }
+
 
             // Validate session using SessionService
             SessionValidationResult validationResult =
