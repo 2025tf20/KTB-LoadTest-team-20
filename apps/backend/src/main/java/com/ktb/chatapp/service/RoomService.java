@@ -9,11 +9,7 @@ import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -222,12 +218,19 @@ public class RoomService {
         if (room == null) return null;
 
         User creator = null;
+        /*
         if (room.getCreator() != null) {
             creator = userRepository.findById(room.getCreator()).orElse(null);
         }
 
+         */
+
         Set<String> participantsIds = room.getParticipantIds();
-        List<User> participants = userRepository.findAllById(participantsIds);
+        long cnt= participantsIds.size();
+        List<UserResponse> participants = new ArrayList<UserResponse>();
+        for (int i = 0; i < cnt ; i++){
+            participants.add(new UserResponse());
+        }
 
         // 최근 10분간 메시지 수 조회
         LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
@@ -237,19 +240,8 @@ public class RoomService {
             .id(room.getId())
             .name(room.getName() != null ? room.getName() : "제목 없음")
             .hasPassword(room.isHasPassword())
-            .creator(creator != null ? UserResponse.builder()
-                .id(creator.getId())
-                .name(creator.getName() != null ? creator.getName() : "알 수 없음")
-                .email(creator.getEmail() != null ? creator.getEmail() : "")
-                .build() : null)
-            .participants(participants.stream()
-                .filter(p -> p != null && p.getId() != null)
-                .map(p -> UserResponse.builder()
-                    .id(p.getId())
-                    .name(p.getName() != null ? p.getName() : "알 수 없음")
-                    .email(p.getEmail() != null ? p.getEmail() : "")
-                    .build())
-                .collect(Collectors.toList()))
+            .creator(null)
+            .participants(participants)
             .createdAtDateTime(room.getCreatedAt())
             .isCreator(creator != null && creator.getId().equals(name))
             .recentMessageCount((int) recentMessageCount)

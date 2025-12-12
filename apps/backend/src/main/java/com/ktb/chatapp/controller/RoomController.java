@@ -20,9 +20,8 @@ import jakarta.validation.Valid;
 import java.security.Principal;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -115,7 +114,6 @@ public class RoomController {
 
             // 서비스에서 페이지네이션 처리
             RoomsResponse response = roomService.getAllRoomsWithPagination(pageRequest, principal.getName());
-
             // 캐시 설정
             return ResponseEntity.ok()
                 .cacheControl(CacheControl.maxAge(Duration.ofSeconds(10)))
@@ -282,19 +280,25 @@ public class RoomController {
     }
 
     private RoomResponse mapToRoomResponse(Room room, String name) {
-        List<UserResponse> participantSummaries = userRepository.findAllById(room.getParticipantIds())
-                .stream()
-                .map(UserResponse::from)
-                .toList();
 
-        UserResponse creatorSummary = participantSummaries.stream()
+        Set<String> participantsIds = room.getParticipantIds();
+        long cnt= participantsIds.size();
+        List<UserResponse> participants = new ArrayList<UserResponse>();
+        for (int i = 0; i < cnt ; i++){
+            participants.add(new UserResponse());
+        }
+        UserResponse creatorSummary = null;
+                /*
+                participantSummaries.stream()
                 .filter(p -> p.getId().equals(room.getCreator()))
                 .findFirst()
                 .orElseGet(() -> userRepository.findById(room.getCreator())
                         .map(UserResponse::from)
                         .orElseThrow(() -> new RuntimeException("Creator not found for room " + room.getId())));
 
-        boolean isCreator = room.getCreator().equals(name);
+                 */
+
+        boolean isCreator = false; //room.getCreator().equals(name);
 
         // 최근 10분간 메시지 수 조회
         LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
@@ -305,7 +309,7 @@ public class RoomController {
                 .name(room.getName())
                 .hasPassword(room.isHasPassword())
                 .creator(creatorSummary)
-                .participants(participantSummaries)
+                .participants(participants)
                 .createdAtDateTime(room.getCreatedAt() != null ? room.getCreatedAt() : LocalDateTime.now())
                 .isCreator(isCreator)
                 .recentMessageCount((int) recentMessageCount)
