@@ -61,19 +61,15 @@ public class S3FileService {
     /**
      * 채팅 파일 업로드용 Presigned URL 생성
      */
-    public ChatUploadDto chatFileUpload(String fileName, long size, String mimetype) {
-        String key = generateKey(fileName);
-        String presignedUrl = generatePresignedPutUrl(key, mimetype);
-
+    public ChatUploadDto chatFileUpload(String fileKey, String fileName, long size, String mimetype) {
         File file = File.builder()
-                .key(key)
+                .key(fileKey)
                 .originalName(fileName)
                 .size(size)
                 .mimetype(mimetype)
                 .build();
 
         return ChatUploadDto.builder()
-                .presignedUrl(presignedUrl)
                 .file(file)
                 .build();
     }
@@ -112,7 +108,7 @@ public class S3FileService {
      * 버킷이 public일 때만 사용
      */
     public String getPublicUrl(String key) {
-        return String.format("https://%s.s3.%s.amazonaws.com/%s", bucket, region, key);
+        return key;
     }
 
     // ===== Private 헬퍼 메서드 =====

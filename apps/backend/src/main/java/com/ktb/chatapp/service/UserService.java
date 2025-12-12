@@ -137,7 +137,7 @@ public class UserService {
                 true,
                 "프로필 이미지가 업데이트되었습니다.",
                 profileUploadDto.getPresignedUrl(),
-                s3FileService.getPublicUrl(profileUploadDto.getKey())
+                profileUploadDto.getKey()
         );
     }
 
