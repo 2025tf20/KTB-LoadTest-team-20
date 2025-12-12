@@ -120,7 +120,7 @@ const FileMessage = ({
         return (
             <div className="bg-transparent-pattern">
                 <img
-                    src={previewUrl}
+                    src={`https://ktb-team20.s3.ap-northeast-2.amazonaws.com/uploads/${previewUrl}`}
                     alt={msg.file.fileName}
                     className="max-w-[400px] max-h-[400px] object-cover object-center rounded-md"
                     onError={(e) => {

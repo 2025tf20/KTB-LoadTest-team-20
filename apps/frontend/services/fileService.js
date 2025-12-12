@@ -5,7 +5,7 @@ import { Toast } from '../components/Toast';
 class FileService {
     constructor() {
         this.baseUrl = process.env.NEXT_PUBLIC_API_URL;
-        this.s3BaseUrl = 'https://ktb-team20.s3.ap-northeast-2.amazonaws.com';
+        this.s3BaseUrl = 'https://ktb-team20.s3.ap-northeast-2.amazonaws.com/uploads/';
 
         this.allowedTypes = {
             image: {
@@ -76,29 +76,36 @@ class FileService {
         if (!validationResult.success) {
             return validationResult;
         }
+
         try {
+            const key = `${crypto.randomUUID()}${file.name}`;
+            const uploadUrl = `${this.s3BaseUrl}${key}`;
+            console.log(key)
+            console.log(uploadUrl)
             // 1. 백엔드에서 Presigned PUT URL 받기
-            const presignedResponse = await axiosInstance.post(
+            const response = await axiosInstance.post(
                 `${this.baseUrl}/api/files/upload`,
                 {
+                    fileKey: key,
                     fileName: file.name,
                     fileSize: file.size,
                     mimeType: file.type
                 },
                 { withCredentials: true }
             );
+            
 
-            if (!presignedResponse.data.success) {
+            if (!response.data.success) {
                 return {
                     success: false,
-                    message: presignedResponse.data.message || '업로드 URL 생성 실패'
+                    message: response.data.message || '업로드 URL 생성 실패'
                 };
             }
 
-            const { presignedUrl, file: fileMetadata } = presignedResponse.data;
+            //const { presignedUrl, file: fileMetadata } = presignedResponse.data;
 
             // 2. S3에 직접 업로드
-            await axios.put(presignedUrl, file, {
+            await axios.put(uploadUrl, file, {
                 headers: {
                     'Content-Type': file.type
                 },
@@ -116,8 +123,12 @@ class FileService {
                 success: true,
                 data: {
                     file: {
-                        ...fileMetadata,
-                        url: this.getS3Url(fileMetadata.key)
+                        //...fileMetadata,
+                        key: key, 
+                        mimetype:file.type,
+                        originalName:file.name,
+                        size:file.size,
+                        url: uploadUrl                        
                     }
                 }
             };
@@ -160,7 +171,7 @@ class FileService {
      * S3 URL 생성
      */
     getS3Url(key) {
-        return `${this.s3BaseUrl}/${key}`;
+        return `${this.s3BaseUrl}${key}`;
     }
 
     /**
@@ -170,7 +181,7 @@ class FileService {
         console.log("!!!!!!")
         console.log(file);
         if (!file?.key) return '';
-        return file.fileUrl;
+        return this.getS3Url(file.fileUrl);
     }
 
     getFileExtension(filename) {

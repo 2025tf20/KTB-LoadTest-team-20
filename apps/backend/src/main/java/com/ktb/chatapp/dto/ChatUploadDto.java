@@ -9,6 +9,5 @@ import lombok.Getter;
 @AllArgsConstructor
 @Getter
 public class ChatUploadDto {
-    String presignedUrl;
     File file;
 }

@@ -198,8 +198,11 @@ public class ChatMessageHandler {
 
     private Message handleFileMessage(String roomId, String userId, MessageContent messageContent,
                                       ChatMessageRequest.FileDataRequest fileData) {
-        if (fileData == null || fileData.getKey() == null) {
+        if (fileData == null) {
             throw new IllegalArgumentException("파일 데이터가 올바르지 않습니다.");
+        }
+        if (fileData.getKey() == null) {
+            throw new IllegalArgumentException("2");
         }
 
         // ✅ 프론트에서 받은 S3 key로 File 객체 생성
@@ -249,7 +252,7 @@ public class ChatMessageHandler {
         messageResponse.setMetadata(message.getMetadata());
         if(message.getFile() != null){
             File file = message.getFile();
-            messageResponse.setFile(FileResponse.from(file, s3FileService.getPublicUrl(file.getKey()), sender.getName(), message.getTimestamp()));
+            messageResponse.setFile(FileResponse.from(file, file.getKey(), sender.getName(), message.getTimestamp()));
         }
         return messageResponse;
     }

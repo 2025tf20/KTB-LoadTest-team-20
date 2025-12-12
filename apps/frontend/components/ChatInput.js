@@ -99,10 +99,12 @@ const ChatInput = forwardRef(({
     // 메시지 제출 (S3 업로드 포함)
     const handleSubmit = useCallback(async (e) => {
         e?.preventDefault();
-
+        console.log("1")
         // 파일이 있는 경우
         if (files.length > 0) {
+            console.log("2")
             try {
+                console.log("3")
                 setUploading(true);
                 setUploadError(null);
 
@@ -110,17 +112,20 @@ const ChatInput = forwardRef(({
                 if (!file || !file.file) {
                     throw new Error('파일이 선택되지 않았습니다.');
                 }
+                console.log("4")
 
                 // S3에 파일 업로드
                 const uploadResult = await fileService.uploadFile(
                     file.file,
                     (progress) => setUploadProgress(progress)
                 );
+                console.log("5")
 
                 if (!uploadResult.success) {
                     throw new Error(uploadResult.message || '파일 업로드 실패');
                 }
-
+                    
+                console.log("6")
                 // 업로드 성공 - 메시지 전송
                 onSubmit({
                     type: 'file',
@@ -128,10 +133,12 @@ const ChatInput = forwardRef(({
                     fileData: uploadResult.data.file // S3 key 등 파일 메타데이터
                 });
 
+                console.log("7")
                 // 초기화
                 setMessage('');
                 setFiles([]);
                 setUploadProgress(0);
+                console.log("")
 
             } catch (error) {
                 console.error('File submit error:', error);

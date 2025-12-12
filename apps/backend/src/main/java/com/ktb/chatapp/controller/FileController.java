@@ -49,7 +49,9 @@ public class FileController {
             @RequestBody PresignedUrlRequest request,
             Principal principal
     ) {
+        System.out.println("upload");
         ChatUploadDto result = s3FileService.chatFileUpload(
+                request.getFileKey(),
                 request.getFileName(),
                 request.getFileSize(),
                 request.getMimeType()
@@ -57,7 +59,6 @@ public class FileController {
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
-                "presignedUrl", result.getPresignedUrl(),
                 "file", result.getFile()
         ));
     }
