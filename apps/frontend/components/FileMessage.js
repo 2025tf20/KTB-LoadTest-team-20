@@ -72,23 +72,16 @@ const FileMessage = ({
     );
 
     const handleFileDownload = async (e) => {
-        console.log("5")
-
         e.preventDefault();
         e.stopPropagation();
         setError(null);
-
         try {
-            console.log("6")
             if (!msg.file?.fileUrl) throw new Error("파일 URL이 없습니다.");
-
-            await fileService.downloadFromUrl(
+            await fileService.downloadFile(
                 msg.file.fileUrl,
                 msg.file.fileName || "download"
             );
-
         } catch (error) {
-            console.log("6")
             console.error("File download error:", error);
             setError(error.message || "파일 다운로드 중 오류가 발생했습니다.");
         }
