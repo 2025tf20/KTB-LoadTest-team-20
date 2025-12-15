@@ -144,12 +144,13 @@ class FileService {
      */
     async downloadFile(s3Key, originalname) {
         try {
-            const downloadUrl = this.getS3Url(s3Key);
-
+            let downloadUrl = this.getS3Url(s3Key);
+            const timestamp = new Date().getTime();
+            const separator = downloadUrl.includes('?') ? '&' : '?';
+            downloadUrl = `${downloadUrl}${separator}t=${timestamp}`;
             const response = await axios.get(downloadUrl, {
                 responseType: 'blob'
             });
-
             const blob = new Blob([response.data]);
             const blobUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
