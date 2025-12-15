@@ -144,26 +144,83 @@ class FileService {
      */
     async downloadFile(s3Key, originalname) {
         try {
-            let downloadUrl = this.getS3Url(s3Key);
-            const timestamp = new Date().getTime();
-            const separator = downloadUrl.includes('?') ? '&' : '?';
-            downloadUrl = `${downloadUrl}${separator}t=${timestamp}`;
-            const response = await axios.get(downloadUrl, {
-                responseType: 'blob'
+            // 파일 존재 여부 먼저 확인
+            const downloadUrl = this.getS3Url(s3Key);
+            // axios 인터셉터가 자동으로 인증 헤더를 추가합니다
+            const checkResponse = await axiosInstance.head(downloadUrl, {
+                validateStatus: status => status < 500,
+                withCredentials: true
             });
-            const blob = new Blob([response.data]);
+
+            if (checkResponse.status === 404) {
+                return {
+                    success: false,
+                    message: '파일을 찾을 수 없습니다.'
+                };
+            }
+
+            if (checkResponse.status === 403) {
+                return {
+                    success: false,
+                    message: '파일에 접근할 권한이 없습니다.'
+                };
+            }
+
+            if (checkResponse.status !== 200) {
+                return {
+                    success: false,
+                    message: '파일 다운로드 준비 중 오류가 발생했습니다.'
+                };
+            }
+
+            // axios 인터셉터가 자동으로 인증 헤더를 추가합니다
+            const response = await axiosInstance({
+                method: 'GET',
+                url: downloadUrl,
+                responseType: 'blob',
+                timeout: 30000,
+                withCredentials: true
+            });
+
+            const contentType = response.headers['content-type'];
+            const contentDisposition = response.headers['content-disposition'];
+            let finalFilename = originalname;
+
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(
+                    /filename\*=UTF-8''([^;]+)|filename="([^"]+)"|filename=([^;]+)/
+                );
+                if (filenameMatch) {
+                    finalFilename = decodeURIComponent(
+                        filenameMatch[1] || filenameMatch[2] || filenameMatch[3]
+                    );
+                }
+            }
+
+            const blob = new Blob([response.data], {
+                type: contentType || 'application/octet-stream'
+            });
+
             const blobUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = blobUrl;
-            link.download = originalname;
+            link.download = finalFilename;
+            link.style.display = 'none';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            window.URL.revokeObjectURL(blobUrl);
+
+            setTimeout(() => {
+                window.URL.revokeObjectURL(blobUrl);
+            }, 100);
 
             return { success: true };
 
         } catch (error) {
+            if (error.response?.status === 401) {
+                throw new Error('Authentication expired. Please login again.');
+            }
+
             return this.handleDownloadError(error);
         }
     }
